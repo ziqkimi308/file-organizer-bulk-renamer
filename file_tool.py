@@ -113,4 +113,103 @@ def sort_files(dir, dry_run=True, move=False):
 
 	return errors == 0
 
-sort_files(".")
+def bulk_renamer(dir, prefix='', suffix='', replace=None, case=None, regex=None, sequential=False, start_num=1, filter_ext=None, dry_run=False):
+	"""
+	Path is used to iterate source path, create destination path, and rename
+	Datetime is used for distinct filename
+	sys is used to separate content of stderr/stdin
+	re is used for regex substitution
+	
+	string methods used replace, zfill
+	list methods used sort
+	"""
+
+	# Source path
+	dir_path = Path(dir).resolve() # absolute path
+	if not dir_path.is_dir():
+		print(f"Error: {dir} is not a valid directory.", file=sys.stderr)
+		return False
+
+	# filter by files
+	files = [f for f in dir_path.iterdir() if f.is_file()]
+	
+	# filter by extension if exists
+	if filter_ext:
+		files = [f for f in files if f.suffix.lower() == filter_ext.lower()]
+
+	# sort files by name
+	files.sort(key=lambda x: x.name)
+
+	renamed = 0
+	errors = 0
+
+	for i, file_path in enumerate(files, start=start_num):
+		stem = file_path.stem
+		ext = file_path.suffix
+
+		new_stem = stem
+
+		# Apply transformations in order:
+
+		# replace
+		if replace:
+			# unpacking like destructuring in js
+			old, new = replace
+			new_stem = new_stem.replace(old, new)
+
+		# regex
+		if regex:
+			pattern, repl = regex
+			new_stem = re.sub(pattern, repl, new_stem)
+
+		# prefix
+		if prefix:
+			new_stem = prefix + new_stem
+
+		# suffix
+		if suffix:
+			new_stem = new_stem + suffix
+
+		# case
+		# strings are immutable, these methods return new string
+		if case == 'upper':
+			new_stem = new_stem.upper()
+		elif case == 'lower':
+			new_stem = new_stem.lower()
+		elif case == 'title':
+			new_stem = new_stem.title()
+
+		# sequential
+		if sequential:
+			# eg: 001 ... 045
+			last_num = len(files) + start_num - 1
+			padding = len(str(last_num)) # count digit
+			new_stem = str(i).zfill(padding) # string method to pad left side with zeros
+		
+		new_name = new_stem + ext
+		new_path = dir_path / new_name
+
+		# if the new name same as existing name, skip next renaming process
+		if new_path == file_path:
+			continue
+
+		if new_path.exists():
+			timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+			new_name = f"{new_stem}_{timestamp}{ext}"
+			new_path = dir_path / new_name
+		
+		try:
+			if dry_run:
+				print(f"[DRY RUN] Rename: {file_path.name} -> {new_name.name}")
+			else:
+				file_path.rename(new_path)
+				print(f"Rename: {file_path.name} -> {new_name.name}")
+			renamed += 1
+		except OSError as e:
+			print(f"Error renaming {file_path.name}: {e}", file=sys.stderr)
+			errors += 1
+		
+	print(f"\nSummary: {renamed} files renamed, {errors} errors.")
+	if dry_run:
+		print("Dry run completed. No files were actually changed.")
+	return errors == 0
