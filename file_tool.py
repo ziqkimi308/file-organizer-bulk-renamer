@@ -44,7 +44,7 @@ DEFAULT_FOLDER = 'Other'
 # This project is setup with dry_run mode. So some logics written for it.
 # dry_run is shows simulated execution result but does not actually run the real operation
 # also with option to copy or move
-def sort_files(dir, dry_run=True, move=False):
+def organize_files(dir, dry_run=True, move=False):
 	"""
 	Shutil is used to copy/move
 	Path is used to iterate source path, create destination path
@@ -200,10 +200,10 @@ def bulk_renamer(dir, prefix='', suffix='', replace=None, case=None, regex=None,
 		
 		try:
 			if dry_run:
-				print(f"[DRY RUN] Rename: {file_path.name} -> {new_name.name}")
+				print(f"[DRY RUN] Rename: {file_path.name} -> {new_name}")
 			else:
 				file_path.rename(new_path)
-				print(f"Rename: {file_path.name} -> {new_name.name}")
+				print(f"Rename: {file_path.name} -> {new_name}")
 			renamed += 1
 		except OSError as e:
 			print(f"Error renaming {file_path.name}: {e}", file=sys.stderr)
@@ -213,3 +213,96 @@ def bulk_renamer(dir, prefix='', suffix='', replace=None, case=None, regex=None,
 	if dry_run:
 		print("Dry run completed. No files were actually changed.")
 	return errors == 0
+
+def main():
+	# All these keywords shown when executing --help
+	parser = argparse.ArgumentParser(
+		# Text shown at the top of the --help output.
+		description="File Organizer & Bulk Renamer",
+		# Format text - preserves line breaks and spaces
+		formatter_class=argparse.RawDescriptionHelpFormatter,
+		# Text shown at the bottom of the --help output.
+		epilog="""
+Examples:
+# Organize files (copy)
+python file_tool.py organize ~/Downloads
+
+# Organize and move files (dry run)
+python file_tool.py organize ~/Downloads --move --dry-run
+
+# Add prefix to all files
+python file_tool.py rename ~/Documents --prefix "vacation_"
+
+# Replace spaces with underscores and convert to lowercase
+python file_tool.py rename ~/Music --replace " " "_" --case lower
+
+# Rename only .txt files sequentially
+python file_tool.py rename ~/notes --filter .txt --sequential --start 1
+"""
+	)
+
+	# Creates an object that will hold all subcommands added in args.command
+	subparsers = parser.add_subparsers(dest='command', required=True, help='Sub-commands')
+
+	# Organize subcommand
+	# Add subcommand 'organize'
+	org_parser = subparsers.add_parser('organize', help='Organize files by extension')
+
+	# Add arguments 'directory', 'move', and 'dry-run'
+	org_parser.add_argument('directory', help='Directory to organize')
+
+	# -- means optional
+	org_parser.add_argument('--move', action='store_true', help='Move files instead of copying.')
+	org_parser.add_argument('--dry-run', action='store_true', help='Preview changes without executing')
+
+	# Rename subcommand
+	# Define subcommand 'rename'
+	rename_parser = subparsers.add_parser('rename', help='Bulk rename files')
+
+	# Add arguments
+	rename_parser.add_argument('directory', help='Directory containing files')
+
+	rename_parser.add_argument('--prefix', default='', help='Text to add at beginning')
+	rename_parser.add_argument('--suffix', default='', help='Text to add before extension')
+
+	rename_parser.add_argument('--replace', nargs=2, metavar=('OLD','NEW'), help='Replace OLD with NEW in filename')
+	rename_parser.add_argument('--regex', nargs=2, metavar=('PATTERN','REPL'), help='Regex substitution (re.sub())')
+
+	rename_parser.add_argument('--case', choices=['upper', 'lower', 'title'], help='Change filename case')
+
+	rename_parser.add_argument('--sequential', action='store_true', help='Rename files with sequential numbers')
+
+	rename_parser.add_argument('--start', type=int, default=1, metavar='N', help='Starting number for sequential (default: 1)')
+
+	rename_parser.add_argument('--filter', dest='filter_ext', metavar='EXT', help='Only process files with this extension (e.g., .txt)')
+
+	rename_parser.add_argument('--dry-run', action='store_true', help='Preview changes without executing')
+
+	# Parsing the Arguments
+	args = parser.parse_args()
+
+	if args.command == 'organize':
+		# For option args, by default, argparse strips leading dashes -- and replaces dash with underscore _
+		success = organize_files(args.directory, dry_run=args.dry_run,move=args.move)
+	elif args.command == 'rename':
+		# destructuring for multiple arguments
+		replace_tuple = tuple(args.replace) if args.replace else None
+		regex_tuple = tuple(args.regex) if args.regex else None
+
+		success = bulk_renamer(
+			args.directory,
+			prefix=args.prefix,
+			suffix=args.suffix,
+			replace=replace_tuple,
+			regex=regex_tuple,
+			case=args.case,
+			sequential=args.sequential,
+			start_num=args.start,
+			filter_ext=args.filter_ext,
+			dry_run=args.dry_run
+		)
+
+	sys.exit(0 if success else 1)
+
+if __name__ == '__main__':
+	main()
