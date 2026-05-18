@@ -215,6 +215,15 @@ def bulk_renamer(dir, prefix='', suffix='', replace=None, case=None, regex=None,
 	return errors == 0
 
 def main():
+	"""
+	argparse.ArgumentParser() to create parser object
+	add_subparsers() to create subparsers object to hold added subcommand
+	add_parser() to add subcommand
+	action, default, nargs, choices to specify arguments stored
+	parse_args() to parse arguments
+	sys.exit() to immediately terminate program with status code
+	"""
+
 	# All these keywords shown when executing --help
 	parser = argparse.ArgumentParser(
 		# Text shown at the top of the --help output.
